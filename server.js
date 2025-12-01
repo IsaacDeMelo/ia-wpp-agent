@@ -93,7 +93,7 @@ let botStats = {
 if (fs.existsSync(STATS_FILE)) {
     try {
         const savedStats = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
-        // Mesclar dados (respeitando o reinício do dia se necessário, aqui simplificado)
+        // Mesclar dados
         botStats = { ...botStats, ...savedStats };
         // Resetar startTime para o boot atual
         botStats.startTime = Date.now();
@@ -180,23 +180,14 @@ const broadcastStats = () => {
 // --- WHATSAPP CLIENT ---
 
 // Detecção de Executável do Chrome
-// Prioridade: ENV Variable > Docker Path > Local Fallback
+// Prioridade: ENV Variable > Docker Path Stable > Docker Path Generic > Local Fallback
 let puppeteerExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
 
 if (!puppeteerExecutablePath) {
     if (fs.existsSync('/usr/bin/google-chrome-stable')) {
-        puppeteerExecutablePath = '/usr/bin/google-chrome-stable'; // Caminho padrão Docker (com Dockerfile atualizado)
+        puppeteerExecutablePath = '/usr/bin/google-chrome-stable';
     } else if (fs.existsSync('/usr/bin/google-chrome')) {
         puppeteerExecutablePath = '/usr/bin/google-chrome';
-    } else if (process.platform === 'linux') {
-         // Fallbacks para Linux local
-         const commonPaths = ['/usr/bin/chromium', '/usr/bin/chromium-browser'];
-         for (const p of commonPaths) {
-             if (fs.existsSync(p)) {
-                 puppeteerExecutablePath = p;
-                 break;
-             }
-         }
     }
 }
 
@@ -210,7 +201,7 @@ const puppeteerArgs = [
     '--disable-accelerated-2d-canvas',
     '--no-first-run',
     '--no-zygote',
-    '--single-process',
+    '--single-process', 
     '--disable-gpu'
 ];
 
@@ -269,8 +260,6 @@ whatsappClient.on('message', async (message) => {
     if (botConfig.onlyAllowed) {
         // Verifica se o número está na lista
         if (!botConfig.allowedNumbers.includes(senderNumber)) {
-            // Opcional: Logar tentativas bloqueadas
-            // console.log(`Bloqueado: ${senderNumber}`);
             return; 
         }
     }

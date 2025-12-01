@@ -6,7 +6,7 @@ import { Send, Phone, Video, MoreVertical, Paperclip, Smile, Check, CheckCheck }
 interface ChatPlaygroundProps {
   config: AIConfig;
   status: BotStatus;
-  addLog: (msg: string, type: 'info' | 'error' | 'success') => void;
+  addLog: (msg: string, type: 'info' | 'error' | 'success' | 'warning') => void;
   incrementMessageCount: () => void;
 }
 
