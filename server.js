@@ -24,7 +24,11 @@ const __dirname = path.dirname(__filename);
 // Arquivos de Persistência
 const DATA_DIR = path.join(__dirname, '.data');
 if (!fs.existsSync(DATA_DIR)){
-    fs.mkdirSync(DATA_DIR);
+    try {
+        fs.mkdirSync(DATA_DIR);
+    } catch(e) {
+        console.error("Erro ao criar diretório .data:", e);
+    }
 }
 const CONFIG_FILE = path.join(DATA_DIR, 'bot_config.json');
 const STATS_FILE = path.join(DATA_DIR, 'bot_stats.json');
@@ -105,6 +109,8 @@ let uniqueUsersSet = new Set(botStats.uniqueUsers);
 // Função para Salvar Dados
 const saveState = () => {
     try {
+        if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+        
         fs.writeFileSync(CONFIG_FILE, JSON.stringify(botConfig, null, 2));
         
         // Converter Set para Array antes de salvar
@@ -172,31 +178,58 @@ const broadcastStats = () => {
 
 
 // --- WHATSAPP CLIENT ---
-// Detecta executável do Chrome (Crucial para Render)
-const puppeteerExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+
+// Detecção de Executável do Chrome
+// Prioridade: ENV Variable > Docker Path > Local Fallback
+let puppeteerExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+
+if (!puppeteerExecutablePath) {
+    if (fs.existsSync('/usr/bin/google-chrome-stable')) {
+        puppeteerExecutablePath = '/usr/bin/google-chrome-stable'; // Caminho padrão Docker (com Dockerfile atualizado)
+    } else if (fs.existsSync('/usr/bin/google-chrome')) {
+        puppeteerExecutablePath = '/usr/bin/google-chrome';
+    } else if (process.platform === 'linux') {
+         // Fallbacks para Linux local
+         const commonPaths = ['/usr/bin/chromium', '/usr/bin/chromium-browser'];
+         for (const p of commonPaths) {
+             if (fs.existsSync(p)) {
+                 puppeteerExecutablePath = p;
+                 break;
+             }
+         }
+    }
+}
+
+console.log(`Iniciando Puppeteer com executável: ${puppeteerExecutablePath || 'Padrão (Local)'}`);
+
+// Configuração de Argumentos Puppeteer
+const puppeteerArgs = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--single-process',
+    '--disable-gpu'
+];
 
 const whatsappClient = new Client({
-    authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
+    authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
     puppeteer: {
         executablePath: puppeteerExecutablePath,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ],
-        headless: true
+        args: puppeteerArgs,
+        headless: true,
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false
     }
 });
 
 // --- EVENTOS DO WHATSAPP ---
 
 whatsappClient.on('qr', (qr) => {
-    console.log('NOVO QR CODE');
+    console.log('NOVO QR CODE GERADO');
     io.emit('qr_code', qr);
     io.emit('bot_status', 'QR_READY');
 });
@@ -207,15 +240,27 @@ whatsappClient.on('ready', () => {
     io.emit('log', { level: 'success', message: 'WhatsApp conectado!', timestamp: new Date() });
 });
 
+whatsappClient.on('authenticated', () => {
+    console.log('Autenticado com sucesso');
+    io.emit('log', { level: 'info', message: 'Sessão autenticada restaurada.', timestamp: new Date() });
+});
+
+whatsappClient.on('auth_failure', (msg) => {
+    console.error('Falha na autenticação', msg);
+    io.emit('log', { level: 'error', message: `Falha de autenticação: ${msg}`, timestamp: new Date() });
+});
+
 whatsappClient.on('disconnected', (reason) => {
+    console.log('Cliente desconectado:', reason);
     io.emit('bot_status', 'DISCONNECTED');
     io.emit('log', { level: 'warning', message: `Desconectado: ${reason}`, timestamp: new Date() });
 });
 
 whatsappClient.on('message', async (message) => {
+    // Ignora grupos e status
     if (message.from.includes('@g.us') || message.isStatus) return;
     
-    // Normaliza número (remove @c.us e caracteres estranhos)
+    // Normaliza número (remove @c.us)
     const senderNumber = message.from.replace('@c.us', '');
 
     if (!botConfig.isActive) return;
@@ -224,8 +269,8 @@ whatsappClient.on('message', async (message) => {
     if (botConfig.onlyAllowed) {
         // Verifica se o número está na lista
         if (!botConfig.allowedNumbers.includes(senderNumber)) {
-            // Opcional: Logar que ignorou para debug
-            // console.log(`Ignorado: ${senderNumber}`);
+            // Opcional: Logar tentativas bloqueadas
+            // console.log(`Bloqueado: ${senderNumber}`);
             return; 
         }
     }
@@ -248,6 +293,9 @@ whatsappClient.on('message', async (message) => {
     try {
         const chat = await message.getChat();
         
+        // Simular leitura
+        await chat.sendSeen();
+
         const response = await ai.models.generateContent({
             model: botConfig.model,
             contents: message.body,
@@ -277,12 +325,15 @@ whatsappClient.on('message', async (message) => {
 // --- SOCKET.IO ---
 
 io.on('connection', (socket) => {
-    console.log('Cliente conectado');
+    console.log('Frontend conectado via Socket');
     
     socket.emit('config_initial', botConfig);
     broadcastStats();
     
-    if (whatsappClient.info) socket.emit('bot_status', 'CONNECTED');
+    // Envia status atual se já estiver conectado
+    if (whatsappClient.info) {
+        socket.emit('bot_status', 'CONNECTED');
+    }
 
     socket.on('update_config', (newConfig) => {
         botConfig = { ...botConfig, ...newConfig };
@@ -292,8 +343,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('restart_client', async () => {
-        io.emit('log', { level: 'warning', message: 'Reiniciando processo...', timestamp: new Date() });
-        try { await whatsappClient.destroy(); } catch(e) {}
+        io.emit('log', { level: 'warning', message: 'Reiniciando processo do WhatsApp...', timestamp: new Date() });
+        try { 
+            await whatsappClient.destroy(); 
+        } catch(e) {
+            console.error('Erro ao destruir cliente:', e);
+        }
         whatsappClient.initialize();
     });
 
@@ -303,13 +358,18 @@ io.on('connection', (socket) => {
     });
 });
 
-whatsappClient.initialize();
+// Inicialização com tratamento de erro
+try {
+    whatsappClient.initialize();
+} catch (e) {
+    console.error('Erro fatal ao inicializar WhatsApp Client:', e);
+}
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-    console.log(`Server on ${PORT}`);
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
 });
