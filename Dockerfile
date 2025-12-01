@@ -1,4 +1,4 @@
-FROM node:22-slim
+FROM node:20-slim
 
 # Dependências do Chrome
 RUN apt-get update \
