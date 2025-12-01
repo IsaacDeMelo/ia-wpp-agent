@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { AIConfig, ModelType } from '../types';
-import { Save, Sparkles, BrainCircuit, ToggleLeft, ToggleRight, Shield, ShieldAlert, Phone } from 'lucide-react';
+import { Save, Sparkles, BrainCircuit, ToggleLeft, ToggleRight, Shield, Phone, AlertTriangle } from 'lucide-react';
 
 interface AIConfigPanelProps {
   config: AIConfig;
@@ -11,14 +11,11 @@ interface AIConfigPanelProps {
 
 const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog }) => {
   
-  // Local state for edits before saving
   const [localConfig, setLocalConfig] = React.useState<AIConfig>(config);
   const [numbersInput, setNumbersInput] = React.useState('');
 
-  // Sync local state if parent updates (e.g. from server initial load)
   React.useEffect(() => {
     setLocalConfig(config);
-    // Convert array to string for text area
     if (config.allowedNumbers) {
         setNumbersInput(config.allowedNumbers.join(', '));
     }
@@ -29,11 +26,10 @@ const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog
   };
 
   const handleSave = () => {
-    // Process numbers input
     const numbersArray = numbersInput
         .split(',')
-        .map(n => n.trim().replace(/[^0-9]/g, '')) // Remove non-numeric chars
-        .filter(n => n.length > 5); // Basic validation
+        .map(n => n.trim().replace(/[^0-9]/g, ''))
+        .filter(n => n.length > 8); // Validação básica de tamanho de número
 
     const finalConfig = {
         ...localConfig,
@@ -55,12 +51,11 @@ const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog
           className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-bold transition-all shadow-lg shadow-green-500/20"
         >
           <Save size={20} />
-          Aplicar no Servidor
+          Salvar & Aplicar
         </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Settings */}
         <div className="lg:col-span-2 space-y-6">
           
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -68,9 +63,6 @@ const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog
               <BrainCircuit size={20} className="text-purple-600" />
               Prompt do Sistema (Personalidade)
             </label>
-            <p className="text-sm text-slate-500 mb-3">
-              Instrução enviada ao Gemini antes de cada mensagem do WhatsApp.
-            </p>
             <textarea
               className="w-full h-48 p-4 rounded-xl border border-slate-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 outline-none resize-none font-mono text-sm bg-slate-50"
               value={localConfig.systemInstruction}
@@ -79,20 +71,19 @@ const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog
             ></textarea>
           </div>
 
-          {/* SECURITY SECTION */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 border-l-4 border-l-blue-500">
             <div className="flex items-center gap-2 mb-4">
                 <Shield size={20} className="text-blue-600" />
-                <h3 className="font-bold text-slate-800">Segurança & Filtros</h3>
+                <h3 className="font-bold text-slate-800">Filtro de Contatos (Whitelist)</h3>
             </div>
             
             <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl mb-4">
                 <div className="flex-1">
-                    <p className="font-semibold text-slate-800 text-sm">Modo de Resposta</p>
+                    <p className="font-semibold text-slate-800 text-sm">Modo de Segurança</p>
                     <p className="text-xs text-slate-500 mt-1">
                         {localConfig.onlyAllowed 
-                            ? "Respondendo APENAS números da lista abaixo (Seguro)." 
-                            : "Respondendo a TODOS (Cuidado com contas pessoais)."}
+                            ? "Ativado: O bot ignora qualquer número que não esteja na lista abaixo." 
+                            : "Desativado: O bot responderá a QUALQUER mensagem recebida."}
                     </p>
                 </div>
                 <button 
@@ -108,34 +99,37 @@ const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog
             </div>
 
             {localConfig.onlyAllowed && (
-                <div className="animate-fade-in">
-                    <label className="text-sm font-medium text-slate-700 mb-2 block">
-                        Números Permitidos (Whitelist)
+                <div className="animate-fade-in space-y-3">
+                    <label className="text-sm font-medium text-slate-700 block">
+                        Números Permitidos
                     </label>
+                    
                     <div className="relative">
                         <Phone className="absolute left-3 top-3 text-slate-400" size={16} />
                         <textarea 
                             value={numbersInput}
                             onChange={(e) => setNumbersInput(e.target.value)}
-                            className="w-full pl-10 p-3 rounded-lg border border-slate-200 text-sm focus:border-blue-500 outline-none h-24"
-                            placeholder="Ex: 5511999999999, 5521888888888 (Use vírgulas)"
+                            className="w-full pl-10 p-3 rounded-lg border border-slate-200 text-sm focus:border-blue-500 outline-none h-24 font-mono"
+                            placeholder="5511999998888, 5521999997777"
                         />
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">
-                        Insira os números com o código do país (55 para Brasil) e DDD. Sem espaços ou traços, apenas dígitos.
-                    </p>
+                    
+                    <div className="flex gap-2 text-xs text-amber-600 bg-amber-50 p-3 rounded-lg">
+                        <AlertTriangle size={16} className="shrink-0" />
+                        <p>
+                            <strong>Importante:</strong> Digite apenas números (sem + ou -). 
+                            Inclua o código do país (55 para Brasil) e DDD. 
+                            Exemplo: <strong>5511987654321</strong>.
+                        </p>
+                    </div>
                 </div>
             )}
           </div>
-
         </div>
 
-        {/* Side Settings */}
         <div className="space-y-6">
-          
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
             <h3 className="font-bold text-slate-800 mb-6">Parâmetros do Modelo</h3>
-            
             <div className="mb-6">
               <label className="block text-sm font-medium text-slate-700 mb-2">Modelo Gemini</label>
               <div className="space-y-2">
@@ -149,7 +143,6 @@ const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog
                   </div>
                   {localConfig.model === ModelType.FLASH && <div className="w-3 h-3 bg-green-500 rounded-full"></div>}
                 </button>
-
                 <button 
                   onClick={() => handleChange('model', ModelType.PRO)}
                   className={`w-full flex items-center justify-between p-3 rounded-lg border ${localConfig.model === ModelType.PRO ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
@@ -165,8 +158,7 @@ const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog
 
             <div className="mb-6">
               <div className="flex justify-between mb-2">
-                <label className="text-sm font-medium text-slate-700">Criatividade (Temperatura)</label>
-                <span className="text-sm font-bold text-slate-900">{localConfig.temperature}</span>
+                <label className="text-sm font-medium text-slate-700">Criatividade: {localConfig.temperature}</label>
               </div>
               <input 
                 type="range" 
@@ -177,10 +169,6 @@ const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog
                 onChange={(e) => handleChange('temperature', parseFloat(e.target.value))}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-green-600"
               />
-              <div className="flex justify-between text-xs text-slate-400 mt-1">
-                <span>Preciso</span>
-                <span>Criativo</span>
-              </div>
             </div>
 
             <div className="pt-4 border-t border-slate-100">
@@ -197,19 +185,7 @@ const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ config, setConfig, addLog
                 </button>
               </div>
             </div>
-
           </div>
-
-          <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-6 rounded-2xl text-white shadow-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles size={20} className="text-yellow-300" />
-              <h4 className="font-bold">Dica de Teste</h4>
-            </div>
-            <p className="text-sm text-indigo-100 opacity-90">
-              Para testar com segurança, ative o "Apenas Whitelist" e adicione o número de um amigo ou seu número secundário. O bot ignorará todos os outros.
-            </p>
-          </div>
-
         </div>
       </div>
     </div>
