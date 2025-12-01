@@ -198,15 +198,10 @@ const puppeteerArgs = [
     '--no-sandbox',
     '--disable-setuid-sandbox',
     '--disable-dev-shm-usage',
-    '--disable-gpu',
-    '--disable-software-rasterizer',
-    '--disable-features=VizDisplayCompositor',
-    '--no-zygote',
-    '--single-process',
-    '--disable-features=IsolateOrigins',
-    '--disable-features=site-per-process'
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote'
 ];
-
 
 const whatsappClient = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
