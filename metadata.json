@@ -1,0 +1,5 @@
+{
+  "name": "ZapBot AI Manager",
+  "description": "Painel administrativo para bots de WhatsApp com integração de IA Gemini. Gerencie conexões, configure prompts do sistema e teste respostas em tempo real.",
+  "requestFramePermissions": []
+}
