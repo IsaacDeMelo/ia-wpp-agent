@@ -198,22 +198,24 @@ const puppeteerArgs = [
     '--no-sandbox',
     '--disable-setuid-sandbox',
     '--disable-dev-shm-usage',
-    '--disable-accelerated-2d-canvas',
-    '--no-first-run',
+    '--disable-gpu',
+    '--disable-software-rasterizer',
+    '--disable-features=VizDisplayCompositor',
     '--no-zygote',
-    '--single-process', 
-    '--disable-gpu'
+    '--single-process',
+    '--disable-features=IsolateOrigins',
+    '--disable-features=site-per-process'
 ];
+
 
 const whatsappClient = new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
     puppeteer: {
         executablePath: puppeteerExecutablePath,
         args: puppeteerArgs,
-        headless: true,
-        handleSIGINT: false,
-        handleSIGTERM: false,
-        handleSIGHUP: false
+        headless: true,                  // obrigatório no docker
+        dumpio: false,                   // evita travamentos
+        ignoreHTTPSErrors: true          // chrome fecha sem isso às vezes
     }
 });
 
