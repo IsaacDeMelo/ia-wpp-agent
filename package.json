@@ -21,8 +21,7 @@
     "recharts": "^2.12.2",
     "socket.io": "^4.7.4",
     "socket.io-client": "^4.7.4",
-
-    "whatsapp-web.js": "github:orkestral/venom-whatsapp-web.js"
+    "whatsapp-web.js": "^1.25.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
